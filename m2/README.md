@@ -31,6 +31,15 @@ python -m platformio run -d m2
 
 La primera compilacion descarga el framework y las librerias (Adafruit GFX y GC9A01A): tarda varios minutos. Las siguientes son rapidas. Debe terminar en `SUCCESS` sin avisos.
 
+Las versiones estan fijadas en `platformio.ini` y no hay que actualizarlas: el codigo usa la API 2.x de Arduino-ESP32 (`ledcSetup`/`ledcAttachPin`) y una plataforma mas nueva ya no compilaria este commit.
+
+| Componente | Version fijada |
+|---|---|
+| Plataforma `espressif32` (trae Arduino-ESP32 2.0.17) | 7.1.3 |
+| Adafruit GFX Library | 1.12.6 |
+| Adafruit GC9A01A | 1.1.0 |
+| Adafruit BusIO | 1.17.4 |
+
 Alternativa con ventanas: en VS Code instala la extension "PlatformIO IDE", abre la carpeta `m2` y usa el boton de la palomita (Build) y la flecha (Upload) de la barra de abajo.
 
 La placa es la ESP32-C3 SuperMini. PlatformIO no la tiene como tal, asi que `platformio.ini` usa `esp32-c3-devkitm-1` (mismo chip). Con `ARDUINO_USB_CDC_ON_BOOT=1` el `Serial` sale por el USB-C de la placa.
