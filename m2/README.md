@@ -15,9 +15,15 @@ Este README es para armarlo y dejarlo funcionando. Lo que dice "[por verificar]"
 | Programar por USB-C | Solo con SW1 en OFF y la bateria desconectada de la placa |
 | Cargar la Li-Po | Con SW1 en OFF |
 | Monitor serie | Por USB-C, con SW1 en OFF |
-| Demo | Solo bateria (SW1 ON, sin cable USB). Tambien puedes alimentarlo solo con un power bank por USB-C, sin la bateria en el circuito. |
+| Demo | Solo bateria (SW1 ON, sin cable USB) |
 
 Regla simple: o USB, o bateria. Si cambias de una a otra, primero apaga SW1 y desconecta la fuente anterior.
+
+> **La bateria nadie la vigila.** El firmware no mide la Li-Po y el convertidor sigue funcionando hasta que la
+> celda esta casi vacia. Antes de cada sesion mide la celda con el multimetro (SW1 en OFF, en su conector): si
+> esta cerca de 3.5 V, cargala; bajo ~3.3 V no se usa. Carga siempre vigilada, sobre una superficie que no arda,
+> nunca tapada ni dentro de una mochila. Con el plan B (Li-Po al pin 5V) la regla de USB y bateria es la misma.
+> Detalle: nota de electronica `demo-jije.md`, secciones 3.2, 3.4, 5 y 6.
 
 ## 2. Instalar y compilar
 
@@ -150,7 +156,7 @@ Despues de editar `marcas.h`: compila y flashea de nuevo (seccion 2 y 3).
 
 Botones: **A** y **B**. Pulsacion larga = 1 s.
 
-1. **Enciende** (SW1 ON, solo bateria o power bank) con el equipo **quieto sobre una superficie**. Salen el logo y la autoprueba ("IMU OK", "Pantalla OK").
+1. **Mide la celda** (seccion 1) y **enciende** (SW1 ON, solo bateria) con el equipo **quieto sobre una superficie**. Salen el logo y la autoprueba ("IMU OK", "Pantalla OK").
 2. **Espera "Midiendo"** (unos 3 s, no lo muevas). El anillo se llena y el equipo mide solo su desviacion en reposo. Si lo mueves, el anillo no avanza hasta que vuelva a estar quieto.
 3. **Apunta a la marca 1 y manten B 1 s.** La pantalla dice "Marca 1" y "Apunta y sujeta B"; el anillo se llena y sale "Sync listo". El equipo ahora sabe donde esta la marca 1.
 4. **Sigue la guia hacia la marca 2.** Lejos de la marca ves una flecha y la estrella en el borde; cerca, las escalas (giro abajo, altura a la derecha) y la estrella se acerca al centro. Cuando sale **"EN MIRA"** estas apuntando a la marca.
