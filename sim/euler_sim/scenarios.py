@@ -2,7 +2,8 @@
 
 Cronologia (segundos simulados):
   0-5     los M2 encienden escalonados (hora aleatoria por semilla)
-  20      los 10 M2 piden acople a la vez (el M1 los resuelve en fila: tiene una sola camara)
+  20      los 10 M2 piden acople a la vez (el M1 los resuelve en fila: tiene una sola camara); el M2 que aun no
+          acepto un HB no puede pedirlo (ESPEC. 1): su usuario vuelve a pulsar cada POLL_S hasta que lo acepta
   43.7    el M1 asigna un objetivo a cada M2 (ASSIGN inmediato)
   103.7   reasigna a los pares
   133.7   quita la asignacion del M2 1 (solo el HB se entera)
@@ -29,7 +30,7 @@ def _target_for(nx: int, version: int):
 
 
 def run_full(seed: int, loss: float, reorder: float = 0.0, dup: float = 0.0, n_m2: int = 10,
-             t_fin: float = T_FIN, reorder_max_s: float = 3.0, hb_after_assign: bool = False) -> Dict[str, object]:
+             t_fin: float = T_FIN, reorder_max_s: float = 3.0, hb_after_assign: bool = True) -> Dict[str, object]:
     rng = random.Random(seed * 7919 + 1)
     net = VirtualNet(seed=seed, impair=Impairment(loss=loss, reorder=reorder, dup=dup, reorder_max_s=reorder_max_s),
                      m1_cfg=M1Config(hb_after_assign=hb_after_assign))
@@ -41,6 +42,7 @@ def run_full(seed: int, loss: float, reorder: float = 0.0, dup: float = 0.0, n_m
     events = []                         # (t, nx) cada vez que cambia lo esperado de un M2
     plan = [(T_DOCK, "dock"), (T_ASSIGN, "assign"), (T_REASSIGN, "reassign"), (T_CLEAR, "clear")]
     done = set()
+    dock_pending = set(net.m2)
     history: Dict[int, List[tuple]] = {nx: [] for nx in net.m2}   # (t, target) muestreado
 
     t = 0.0
@@ -51,8 +53,7 @@ def run_full(seed: int, loss: float, reorder: float = 0.0, dup: float = 0.0, n_m
             if what not in done and net.now >= when:
                 done.add(what)
                 if what == "dock":
-                    for core in net.m2.values():
-                        core.request_dock(net.now)
+                    pass                        # se atiende abajo, en cada paso, hasta que todos lo logren
                 elif what in ("assign", "reassign"):
                     for nx in net.m2:
                         if what == "reassign" and nx % 2:
@@ -62,9 +63,13 @@ def run_full(seed: int, loss: float, reorder: float = 0.0, dup: float = 0.0, n_m
                         expected[nx] = (tid, ra, dec)
                         events.append((net.now, nx, expected[nx], what))
                 elif what == "clear":
-                    net.m1.clear_assignment(1)
+                    net.m1.clear_assignment(1, net.now)
                     expected[1] = None
                     events.append((net.now, 1, None, what))
+        if "dock" in done:
+            for nx in sorted(dock_pending):
+                if net.m2[nx].request_dock(net.now):
+                    dock_pending.discard(nx)
         for nx, core in net.m2.items():
             tg = core.target
             history[nx].append((net.now, None if tg is None else (tg.target_id, tg.ra_e7, tg.dec_e7)))

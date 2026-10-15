@@ -91,11 +91,23 @@ def test_el_hb_es_la_verdad_si_ya_no_me_nombra_pierdo_el_objetivo():
     net.m1.assign(1, 5, RA, DEC, net.now)
     net.run_until(12.0)
     assert net.m2[1].target is not None
-    net.m1.clear_assignment(1)
-    net.run_until(12.5)
-    assert net.m2[1].target is not None                  # no hay ASSIGN de borrado: espera al HB
-    net.run_until(20.1)
-    assert net.m2[1].target is None
+    net.m1.clear_assignment(1, net.now)
+    net.run_until(12.04)
+    assert net.m2[1].target is not None                  # no hay ASSIGN de borrado: espera al HB extra
+    net.run_until(12.1)
+    assert net.m2[1].target is None                      # el HB extra sale a los 50 ms, no a los 8 s del periodico
+
+
+def test_el_hb_extra_no_corre_el_periodo_del_hb_ordinario():
+    net = red()
+    net.run_until(3.0)
+    net.m1.assign(1, 5, RA, DEC, net.now)
+    net.run_until(12.0)
+    net.m1.clear_assignment(1, net.now)
+    net.run_until(42.0)
+    t = [r.t_send for r in net.sent("Heartbeat", dst="M2-1")]
+    assert [x for x in t if abs(x - round(x / 10.0) * 10.0) < 1e-9] == [0.0, 10.0, 20.0, 30.0, 40.0]
+    assert len(t) == 7                                   # 5 ordinarios + 2 extra (asignar y quitar)
 
 
 def test_h3_a_nivel_de_m2_un_hb_sin_la_asignacion_pisa_al_assign_y_el_siguiente_la_restituye():
@@ -534,9 +546,13 @@ def test_dock_req_viejo_que_llega_tarde_no_pisa_al_nuevo():
     m.core.tick(0.0)
     m.core.on_packet(_req(1, 5), 0.1)
     m.core.on_packet(_req(1, 6), 0.2)                    # el M2 pidio otro acople
+    m.core.tick(0.2)                                     # el solve de seq 6 arranca: el acople esta ACTIVO
+    assert m.core.dock_phase(1) is DockPhase.SOLVING
     m.core.on_packet(_req(1, 5), 0.3)                    # el viejo llega tarde
     assert m.core.docks[1].seq == 6
+    assert m.core.dock_phase(1) is DockPhase.SOLVING
     assert m.core.rejected["old_dock_req"] == 1
+    assert len(m.tipos(p.Ack)) == 2                      # el viejo no se confirma
 
 
 def test_resultado_de_un_solve_cuyo_acople_fue_reemplazado_se_descarta():
@@ -596,6 +612,7 @@ def test_el_m1_ignora_un_ack_de_otra_secuencia():
 def test_el_m2_ignora_un_ack_de_otra_secuencia():
     enviados = []
     m2 = M2Core(M2Config(nx=1, dock_seq0=40), enviados.append)
+    m2.on_packet(_hb(1), 0.0)
     m2.request_dock(0.0)
     m2.on_packet(p.encode(p.Ack(1, 99)), 0.1)
     assert m2.dock_state is DockState.WAIT_ACK
@@ -624,3 +641,182 @@ def test_con_el_m1_apagado_ni_envia_ni_recibe():
     assert net.m1.rx == rx0                              # los STATUS del M2 no llegan a nadie
     assert [r for r in net.log if r.src == "M1" and r.t_send >= 11.0] == []
     assert sum(net.m1.tx.values()) == tx0 + 1            # solo el intento que cuenta el propio M1
+
+
+# --- B1: un M2 que se reinicia vuelve a contar desde dock_seq0 y debe poder acoplarse (ESPEC. 5.3) ---
+
+def _reiniciar_m2(net, nx=1):
+    """El M2 pierde la energia y enciende de nuevo: instancia nueva con el contador de acople en su valor de arranque."""
+    net.add_m2(nx, start_s=net.now, dock_seq0=0)
+    limite = net.now + 11.0
+    while net.m2[nx].base_id is None:                    # no puede pedir acople antes de su primer HB (R5)
+        assert net.now < limite
+        net.run_until(net.now + 0.25)
+    return net.m2[nx]
+
+
+@pytest.mark.parametrize("acoples_antes", [1, 3])
+def test_m2_reiniciado_se_acopla_al_primer_intento(acoples_antes):
+    net = red()
+    net.run_until(1.0)
+    for _ in range(acoples_antes):
+        assert net.m2[1].request_dock(net.now)
+        net.run_until(net.now + 5.0)
+    assert net.m2[1].dock_state is DockState.DONE
+    solves = net.m1.solves
+    m2 = _reiniciar_m2(net)
+    assert m2.request_dock(net.now)
+    net.run_until(net.now + 6.0)
+    assert m2.dock_state is DockState.DONE
+    assert m2.dock_finished - m2.dock_started < net.m1.cfg.solve_time_s + 0.1
+    assert net.m1.solves == solves + 1
+    assert len(net.sent("DockReq", src="M2-1")) == acoples_antes + 1   # ni un reintento
+
+
+def test_dock_req_duplicado_despues_de_done_se_resuelve_otra_vez_y_el_m2_no_reaplica():
+    net = red()
+    net.run_until(1.0)
+    net.m2[1].request_dock(net.now)
+    net.run_until(net.now + 5.0)
+    m2 = net.m2[1]
+    assert m2.dock_state is DockState.DONE
+    solves, aplicadas, seq = net.m1.solves, m2.ref_applied, m2.ref.seq
+    net.inject(None, p.encode(p.DockReq(1, seq)))        # copia retrasada del DOCK_REQ que ya se atendio
+    net.run_until(net.now + 6.0)
+    assert net.m1.solves == solves + 1
+    assert m2.ref_applied == aplicadas                   # el DOCK_REF repetido se reconfirma, no se reaplica
+    assert net.m1.dock_phase(1) is DockPhase.DONE
+
+
+def test_dock_req_viejo_despues_de_cerrado_es_un_acople_nuevo():
+    m = _M1Directo(solve_time_s=1.0)
+    m.core.on_packet(_req(1, 5), 0.0)
+    for t in (0.0, 1.0):
+        m.core.tick(t)
+    m.core.on_packet(p.encode(p.Ack(1, 5)), 1.1)
+    assert m.core.dock_phase(1) is DockPhase.DONE
+    m.core.on_packet(_req(1, 2), 2.0)                    # el M2 se reinicio y cuenta desde otro valor
+    assert m.core.docks[1].seq == 2 and m.core.dock_phase(1) is DockPhase.QUEUED
+    assert "old_dock_req" not in m.core.rejected
+
+
+def test_dock_req_repetido_del_acople_en_curso_se_confirma_y_no_se_resuelve_otra_vez():
+    m = _M1Directo(solve_time_s=2.0)
+    m.core.on_packet(_req(1, 7), 0.0)
+    m.core.tick(0.0)
+    m.core.on_packet(_req(1, 7), 1.0)                    # SOLVING
+    m.core.tick(2.0)
+    m.core.on_packet(_req(1, 7), 2.5)                    # REF_SENT
+    m.core.tick(4.0)
+    assert m.core.solves == 1
+    assert len(m.tipos(p.Ack)) == 3
+
+
+# --- B2: el DOCK_REF que no llega en ref_wait_s es error de acople, sin reenviar el DOCK_REQ ---
+
+def test_sin_dock_ref_el_m2_falla_a_ack_mas_60_s_con_un_solo_dock_req():
+    net = red()
+    net.run_until(1.0)
+    net.drop_filter = lambda t, s, d, k: isinstance(k, p.DockRef)
+    net.m2[1].request_dock(net.now)
+    net.run_until(net.now + 70.0)
+    c = net.m2[1]
+    t_ack = net.sent("Ack", src="M1")[0].t_deliver
+    assert c.dock_state is DockState.FAILED_TIMEOUT
+    assert abs(c.dock_finished - (t_ack + c.cfg.ref_wait_s)) < 0.01
+    assert len(net.sent("DockReq")) == 1
+    assert len(net.sent("DockRef")) == 8                 # el M1 agota los suyos y se rinde
+
+
+# --- R5: sin HB aceptado no hay DOCK_REQ ---
+
+def test_sin_hb_no_sale_ningun_dock_req_y_despues_del_primer_hb_si():
+    enviados = []
+    m2 = M2Core(M2Config(nx=1), enviados.append)
+    assert not m2.request_dock(0.5)
+    assert enviados == [] and m2.dock_state is DockState.IDLE
+    m2.on_packet(_hb(1), 1.0)
+    assert m2.request_dock(1.5)
+    assert [type(p.decode(b)) for b in enviados] == [p.DockReq]
+
+
+# --- B3: regla de objetivo (ESPEC. 5.1) ---
+
+A_ASG = p.Assignment(1, 5, RA, DEC)
+
+
+def _m2_con_asignacion():
+    m2, _ = _m2_directo()
+    m2.on_packet(_hb(1, asg=[A_ASG]), 1.0)
+    assert m2.target == A_ASG and not m2.target_local
+    return m2
+
+
+def _local(m2, tid=9):
+    m2.select_local(tid, 111 * p.E7, 22 * p.E7)
+    return p.Assignment(1, tid, 111 * p.E7, 22 * p.E7)
+
+
+def test_objetivo_local_sobrevive_a_hb_con_la_misma_asignacion_aunque_cambie_su_ra():
+    m2 = _m2_con_asignacion()
+    loc = _local(m2)
+    for k in range(3):
+        m2.on_packet(_hb(2 + k, asg=[p.Assignment(1, 5, RA + (k + 1) * p.E7, DEC)]), 11.0 + 10 * k)
+    assert m2.target == loc and m2.target_local
+
+
+def test_objetivo_local_sobrevive_a_hb_sin_mi_nx_y_luego_la_aparicion_de_una_asignacion_lo_reemplaza():
+    m2 = _m2_con_asignacion()
+    loc = _local(m2)
+    for k in range(3):
+        m2.on_packet(_hb(2 + k), 11.0 + 10 * k)
+    assert m2.target == loc and m2.target_local
+    m2.on_packet(_hb(5, asg=[A_ASG]), 41.0)              # aparecer tambien es cambio
+    assert m2.target == A_ASG and not m2.target_local
+
+
+def test_un_assign_reemplaza_la_eleccion_local():
+    m2 = _m2_con_asignacion()
+    _local(m2)
+    m2.on_packet(p.encode(p.Assign(1, 6, RA, DEC)), 12.0)
+    assert m2.target == p.Assignment(1, 6, RA, DEC) and not m2.target_local
+    m2.on_packet(_hb(2, asg=[p.Assignment(1, 6, RA + p.E7, DEC)]), 21.0)
+    assert m2.target.ra_e7 == RA + p.E7                  # ya es del M1: el HB vuelve a refrescarlo
+
+
+def test_hb_con_otro_id_reemplaza_la_eleccion_local_caso_del_assign_perdido():
+    m2 = _m2_con_asignacion()
+    _local(m2)
+    b = p.Assignment(1, 6, RA, DEC)
+    m2.on_packet(_hb(2, asg=[b]), 11.0)
+    assert m2.target == b and not m2.target_local
+
+
+def test_con_origen_m1_un_hb_con_el_mismo_id_y_otra_ra_refresca_ra():
+    m2 = _m2_con_asignacion()
+    nuevo = p.Assignment(1, 5, RA + 123_456, DEC - 7)    # la Luna o un planeta: el M1 recalcula
+    m2.on_packet(_hb(2, asg=[nuevo]), 11.0)
+    assert m2.target == nuevo and not m2.target_local
+
+
+def test_con_origen_local_el_mismo_caso_no_toca_el_objetivo():
+    m2 = _m2_con_asignacion()
+    loc = _local(m2, tid=5)                              # el usuario eligio con botones el mismo id que tenia el M1
+    m2.on_packet(_hb(2, asg=[p.Assignment(1, 5, RA + 123_456, DEC - 7)]), 11.0)
+    assert m2.target == loc and m2.target_local
+
+
+def test_cambio_de_base_tras_perderla_el_primer_hb_con_mi_nx_se_aplica():
+    m2 = _m2_con_asignacion()
+    _local(m2)
+    m2.on_packet(_hb(1, base=2, asg=[A_ASG]), 50.0)      # la base 1 callo hace 49 s; la base 2 repite el mismo id
+    assert m2.base_id == 2
+    assert m2.target == A_ASG and not m2.target_local
+
+
+def test_la_misma_base_que_vuelve_no_borra_la_memoria_ni_la_eleccion_local():
+    m2 = _m2_con_asignacion()
+    loc = _local(m2)
+    m2.on_packet(_hb(2, asg=[A_ASG]), 50.0)              # pasaron 49 s, la base es la misma
+    assert m2.base_id == 1
+    assert m2.target == loc and m2.target_local

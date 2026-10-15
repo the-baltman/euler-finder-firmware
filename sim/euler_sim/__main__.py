@@ -47,7 +47,7 @@ def main() -> None:
     s.add_argument("--reorder", type=float, default=0.2)
     s.add_argument("--reorder-max", type=float, default=3.0)
     s.add_argument("--dup", type=float, default=0.0)
-    s.add_argument("--hb-after-assign", action="store_true", help="variante A/B de la carrera H3")
+    s.add_argument("--sin-hb-extra", action="store_true", help="referencia: sin el HB extra tras cada cambio (H3)")
     u = sub.add_parser("udp")
     u.add_argument("--m2", type=int, default=10)
     u.add_argument("--loss", type=float, default=0.1)
@@ -60,9 +60,9 @@ def main() -> None:
     a = ap.parse_args()
     if a.cmd == "sweep":
         print(f"{a.seeds} semillas por nivel; reorder={a.reorder} (max {a.reorder_max} s); dup={a.dup}; "
-              f"hb_after_assign={a.hb_after_assign}")
+              f"hb_extra={not a.sin_hb_extra}")
         print(format_sweep(sweep(a.losses, range(a.seeds), reorder=a.reorder, dup=a.dup,
-                                 reorder_max_s=a.reorder_max, hb_after_assign=a.hb_after_assign)))
+                                 reorder_max_s=a.reorder_max, hb_after_assign=not a.sin_hb_extra)))
     else:
         _udp(a)
 

@@ -76,15 +76,14 @@ m("proto-seq-ventana-ancha", P, "SEQ_STALE_WINDOW = 8 ", "SEQ_STALE_WINDOW = 9 "
 m("m1-periodo-hb", M1, "self._next_hb += self.cfg.hb_period_s", "self._next_hb += self.cfg.hb_period_s + 0.001")
 m("m1-hb-sin-secuencia", M1, "self._hb_seq = (self._hb_seq + 1) & 0xFFFF", "pass")
 m("m1-assign-sin-envio", M1, "        self._tx(nx, p.Assign(nx, target_id, ra_e7, dec_e7))", "        pass")
-m("m1-req-repetido-vuelve-a-resolver", M1, "if d is not None and d.seq == req.seq:", "if False:")
+m("m1-req-repetido-vuelve-a-resolver", M1, "if activo and d.seq == req.seq:", "if False:")
 m("m1-ref-sin-limite", M1, "if dock.tries >= self.cfg.ref_max_tries:", "if False:")
 m("m1-ref-reintento-lento", M1, "dock.next_retx = now + self.cfg.ref_retry_s", "dock.next_retx = now + 2 * self.cfg.ref_retry_s")
 m("m1-ack-no-cierra", M1, "if d is not None and d.seq == pkt.seq and d.phase is DockPhase.REF_SENT:", "if False:")
 m("m1-ack-ignora-seq", M1, "if d is not None and d.seq == pkt.seq and d.phase is DockPhase.REF_SENT:", "if d is not None and d.phase is DockPhase.REF_SENT:")
 m("m1-solves-en-paralelo", M1, "        if self._solving is None and self._queue:\n            self._start_solve(now)", "        if self._queue:\n            self._start_solve(now)")
-m("m1-req-viejo-pisa", M1, "if p.seq_delta(req.seq, d.seq) > 0x8000:", "if False:")
+m("m1-req-viejo-pisa", M1, "if activo and p.seq_delta(req.seq, d.seq) > 0x8000:", "if False:")
 m("m1-solve-obsoleto-se-manda", M1, "        if self.docks.get(dock.nx) is not dock:\n            return", "        pass")
-m("m1-fallido-no-reinicia", M1, "            if d.phase is DockPhase.FAILED:", "            if False:")
 m("m1-rafaga-de-hb", M1, "            if self._next_hb <= now:                 # reloj saltado", "            while False:                 # reloj saltado")
 m("m1-borrar-asignacion", M1, "self.assignments.pop(nx, None)", "pass")
 m("m1-status-no-se-guarda", M1, "self.m2_status[pkt.nx] = pkt", "pass")
@@ -96,7 +95,6 @@ m("m1-hb-sin-asignaciones", M1, "asg = tuple(self.assignments[nx] for nx in sort
 m("m2-watchdog-2-hb", M2, "return self._last_hb_rx + self.cfg.watchdog_hb * self.cfg.hb_period_s", "return self._last_hb_rx + (self.cfg.watchdog_hb - 1) * self.cfg.hb_period_s")
 m("m2-watchdog-borde", M2, "return now >= self._watchdog_deadline()", "return now > self._watchdog_deadline()")
 m("m2-guia-depende-de-base", M2, "return self.synced and self.target is not None", "return self.synced and self.target is not None and not self._lost_flag")
-m("m2-hb-no-borra-objetivo", M2, "self.target = next((a for a in hb.assignments if a.nx == self.nx), None)", "self.target = next((a for a in hb.assignments if a.nx == self.nx), self.target)")
 m("m2-hb-viejo-pisa", M2, "if self._hb_seq is not None and p.seq_is_stale_or_dup(hb.seq, self._hb_seq):", "if False:")
 m("m2-hb-no-refresca-watchdog", M2, "        self._last_hb_rx = now\n", "")
 m("m2-base-ajena", M2, "        elif hb.base_id != self.base_id:", "        elif False:")
@@ -109,7 +107,7 @@ m("m2-dock-sin-limite", M2, "if self._dock_tries >= self.cfg.req_max_tries:", "i
 m("m2-reintento-lento", M2, "self._dock_timer = now + self.cfg.req_retry_s", "self._dock_timer = now + 2 * self.cfg.req_retry_s")
 m("m2-periodo-status", M2, "self._next_status += self.cfg.status_period_s\n", "self._next_status += self.cfg.status_period_s + 0.5\n")
 m("m2-guia-doble", M2, "self.guide_ticks += 1", "self.guide_ticks += 2")
-m("m2-assign-ajeno", M2, "            if pkt.nx != self.nx:\n                self._reject(\"misrouted\")\n            else:\n                self.target", "            if False:\n                self._reject(\"misrouted\")\n            else:\n                self.target")
+m("m2-assign-ajeno", M2, "            if pkt.nx != self.nx:\n                self._reject(\"misrouted\")\n            else:\n                # Un ASSIGN", "            if False:\n                self._reject(\"misrouted\")\n            else:\n                # Un ASSIGN")
 m("m2-apagado-oye", M2, "        if now < self.cfg.start_s:\n            return                                   # apagado", "        if False:\n            return                                   # apagado")
 m("m2-reloj-propio", M2, "return utc + int(round((now - t) * 1000.0))", "return utc")
 m("m2-calidad", M2, "quality = 100 if self.synced else 0", "quality = 100")
@@ -136,7 +134,7 @@ m("virtual-m1-muerto-recibe", VN, "        if self.m1_up:\n            self.m1.o
 m("virtual-broadcast-a-uno", VN, "targets = sorted(self.m2) if dst == BROADCAST else [dst]", "targets = sorted(self.m2)[:1] if dst == BROADCAST else [dst]")
 
 # --- Escenario / barrido ---
-m("barrido-borrado-no-ocurre", SC, "                    net.m1.clear_assignment(1)", "                    pass")
+m("barrido-borrado-no-ocurre", SC, "                    net.m1.clear_assignment(1, net.now)", "                    pass")
 m("barrido-asentamiento-cero", SC, "s_t = last_bad - te + POLL_S", "s_t = 0.0")
 m("barrido-final-ok-siempre", SC, "    final_ok = all(", "    final_ok = True or all(")
 m("barrido-acoples-siempre-10", SC, "docks_done = [c for c in net.m2.values() if c.dock_state.name == \"DONE\"]", "docks_done = list(net.m2.values())")
@@ -163,6 +161,35 @@ m("vec-invalido-aceptable", "protocolo/vectores_dorados.txt", "INVALID tipo_0 00
 m("test-semillas-pocas", "sim/tests/test_barrido.py", "SEMILLAS = range(24)", "SEMILLAS = range(8)")
 m("imp-latencia", IM, "d = self.latency_s + rng.uniform(0.0, self.jitter_s)", "d = self.latency_s + 1.0")
 m("imp-sin-semilla", IM, "if rng.random() < self.loss:", "if __import__('random').random() < self.loss:")
+
+# --- Retrabajo gate 1 (R1-R8) ---
+# R1 (B1): el M2 reiniciado vuelve a contar desde dock_seq0
+m("m1-cerrado-solo-confirma", M1, "if activo and d.seq == req.seq:", "if d is not None and d.seq == req.seq:")
+m("m1-viejo-sin-acople-activo", M1, "if activo and p.seq_delta(req.seq, d.seq) > 0x8000:", "if d is not None and p.seq_delta(req.seq, d.seq) > 0x8000:")
+# R2 (B2): sin DOCK_REF a ACK + ref_wait_s es error, no reenvio
+m("m2-espera-ref-reenvia", M2, "        if self.dock_state is DockState.WAIT_REF:\n            # El M1 confirmo la peticion pero el DOCK_REF no llego en ref_wait_s: error de acople (ESPEC. 5.3).\n            self.dock_state = DockState.FAILED_TIMEOUT\n            self.dock_finished = now\n            self._dock_timer = math.inf\n            return\n", "")
+# R3 (B3): regla de objetivo
+m("m2-hb-igual-pisa-local", M2, "        elif not self.target_local:\n            self.target = nuevo", "        else:\n            self.target = nuevo")
+m("m2-hb-sin-mi-nx-borra-local", M2, "            elif not self.target_local:\n                self.target = None", "            else:\n                self.target = None")
+m("m2-assign-no-limpia-local", M2, "dec_e7)\n                self.target_local = False", "dec_e7)")
+m("m2-hb-otro-id-respeta-local", M2, "            if nuevo is not None:\n                self.target, self.target_local = nuevo, False", "            if nuevo is not None and not self.target_local:\n                self.target, self.target_local = nuevo, False")
+m("m2-hb-compara-por-valor", M2, "if _tid(nuevo) != _tid(self.assigned):", "if nuevo != self.assigned:")
+m("m2-hb-no-refresca-ra", M2, "            self.target = nuevo                         # refresca RA/Dec", "            pass                                        # refresca RA/Dec")
+m("m2-base-nueva-conserva-asignado", M2, "                self.assigned = None            # base nueva", "                pass                            # base nueva")
+m("m2-misma-base-borra-asignado", M2, "            if self.base_id != hb.base_id:\n                self.base_id = hb.base_id\n                self.assigned = None", "            if True:\n                self.base_id = hb.base_id\n                self.assigned = None")
+m("m2-select-local-no-marca", M2, "        self.target_local = True\n", "        self.target_local = False\n")
+# R4 (H3): HB extra tras asignar o quitar
+m("m1-quitar-sin-hb-extra", M1, "        self.assignments.pop(nx, None)\n        self._schedule_extra_hb(now)", "        self.assignments.pop(nx, None)")
+m("m1-hb-extra-apagado-por-defecto", M1, "hb_after_assign: bool = True", "hb_after_assign: bool = False")
+m("m1-hb-extra-corre-el-periodo", M1, "        if now >= self._extra_hb_at:\n            self._extra_hb_at = math.inf\n            self._send_hb(now)", "        if now >= self._extra_hb_at:\n            self._extra_hb_at = math.inf\n            self._send_hb(now)\n            self._next_hb = now + self.cfg.hb_period_s")
+# R5 (H2): sin HB aceptado no hay DOCK_REQ
+m("m2-dock-sin-base", M2, "        if self.base_id is None:\n            return False\n", "")
+# R7 (C2): n <= 10 antes del largo
+m("proto-n-despues-del-largo", P, "        if n > MAX_ASSIGNMENTS:\n            raise InvalidField(f\"{n} asignaciones, maximo {MAX_ASSIGNMENTS}\")\n        _exact(data, HB_HEADER_SIZE + HB_ASSIGNMENT_SIZE * n)\n", "        _exact(data, HB_HEADER_SIZE + HB_ASSIGNMENT_SIZE * n)\n        if n > MAX_ASSIGNMENTS:\n            raise InvalidField(f\"{n} asignaciones, maximo {MAX_ASSIGNMENTS}\")\n")
+# R8 (C3): la norma del cuaternion se valida sobre los f32 que viajan
+m("proto-max-asignaciones-11", P, "MAX_ASSIGNMENTS = MAX_NX ", "MAX_ASSIGNMENTS = 11 ")
+m("proto-cuaternion-overflow-sin-capturar", P, "        except OverflowError:", "        except KeyError:")
+m("proto-cuaternion-sin-redondeo-f32", P, "            q = _QUAT_F32.unpack(_QUAT_F32.pack(*(float(c) for c in q)))", "            pass")
 
 
 M[:] = [x for x in M if x is not None]

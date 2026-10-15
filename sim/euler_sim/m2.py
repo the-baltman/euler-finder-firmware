@@ -46,6 +46,10 @@ ST_ELEGIR_BASE, ST_ACOPLE, ST_MONTAJE, ST_SYNC, ST_GUIA = 1, 2, 3, 4, 5
 SINCE_SYNC_NEVER = 0xFFFF               # "nunca": el campo es u16 y satura
 
 
+def _tid(a: Optional[p.Assignment]) -> Optional[int]:
+    return None if a is None else a.target_id
+
+
 class M2Core:
     def __init__(self, cfg: M2Config, send: Callable[[bytes], None]):
         if not 1 <= cfg.nx <= p.MAX_NX:
@@ -64,6 +68,8 @@ class M2Core:
         self._time_ref: Optional[Tuple[int, float]] = None
         # guiado
         self.target: Optional[p.Assignment] = None
+        self.assigned: Optional[p.Assignment] = None   # lo ultimo que dijo el M1 para mi Nx
+        self.target_local = False                      # el objetivo lo eligio el usuario con los botones
         self.synced = False
         self.sync_time: Optional[float] = None
         self.ref: Optional[p.DockRef] = None
@@ -138,7 +144,9 @@ class M2Core:
             self._dock_timeout(now)
 
     def request_dock(self, now: float) -> bool:
-        """Boton de acople. False si ya hay uno en curso."""
+        """Boton de acople. False si ya hay uno en curso o si aun no se acepto ningun HB (ESPEC. 1, regla H2)."""
+        if self.base_id is None:
+            return False
         if self.dock_state in (DockState.WAIT_ACK, DockState.WAIT_REF):
             return False
         self._dock_seq = (self._dock_seq + 1) & 0xFFFF
@@ -163,7 +171,9 @@ class M2Core:
             if pkt.nx != self.nx:
                 self._reject("misrouted")
             else:
-                self.target = p.Assignment(pkt.nx, pkt.target_id, pkt.ra_e7, pkt.dec_e7)
+                # Un ASSIGN siempre se aplica y reemplaza incluso una eleccion local.
+                self.assigned = self.target = p.Assignment(pkt.nx, pkt.target_id, pkt.ra_e7, pkt.dec_e7)
+                self.target_local = False
         elif isinstance(pkt, p.Ack):
             if pkt.nx != self.nx:
                 self._reject("misrouted")
@@ -193,6 +203,7 @@ class M2Core:
             # Primera base, o la anterior se perdio: se acepta la que hable (puede ser otra o un M1 reiniciado).
             if self.base_id != hb.base_id:
                 self.base_id = hb.base_id
+                self.assigned = None            # base nueva: lo que dijo la anterior ya no cuenta
             self._hb_seq = None
         elif hb.base_id != self.base_id:
             self.foreign_hb += 1
@@ -205,8 +216,23 @@ class M2Core:
         self._lost_flag = False
         self.last_hb = hb
         self._time_ref = (hb.utc_ms, now)
-        # El HB es la fuente de verdad de la asignacion: si ya no me nombra, no tengo objetivo.
-        self.target = next((a for a in hb.assignments if a.nx == self.nx), None)
+        self._apply_hb_assignment(next((a for a in hb.assignments if a.nx == self.nx), None))
+
+    def _apply_hb_assignment(self, nuevo: Optional[p.Assignment]) -> None:
+        """Regla de objetivo (ESPEC. 5.1): el HB manda por flanco, comparando target_id, no por valor."""
+        if _tid(nuevo) != _tid(self.assigned):          # aparecer o desaparecer tambien es cambio
+            self.assigned = nuevo
+            if nuevo is not None:
+                self.target, self.target_local = nuevo, False
+            elif not self.target_local:
+                self.target = None
+        elif not self.target_local:
+            self.target = nuevo                         # refresca RA/Dec: el M1 recalcula la Luna y los planetas
+
+    def select_local(self, target_id: int, ra_e7: int, dec_e7: int) -> None:
+        """Eleccion con los botones del M2: local en v1 (STATUS no lleva objetivo, el M1 no se entera)."""
+        self.target = p.Assignment(self.nx, target_id, ra_e7, dec_e7)
+        self.target_local = True
 
     def _send_status(self, now: float) -> None:
         if self.dock_state in (DockState.WAIT_ACK, DockState.WAIT_REF):
@@ -231,6 +257,12 @@ class M2Core:
         self._tx(p.DockReq(self.nx, self._dock_seq))
 
     def _dock_timeout(self, now: float) -> None:
+        if self.dock_state is DockState.WAIT_REF:
+            # El M1 confirmo la peticion pero el DOCK_REF no llego en ref_wait_s: error de acople (ESPEC. 5.3).
+            self.dock_state = DockState.FAILED_TIMEOUT
+            self.dock_finished = now
+            self._dock_timer = math.inf
+            return
         if self.dock_state not in (DockState.WAIT_ACK, DockState.WAIT_REF):
             self._dock_timer = math.inf
             return

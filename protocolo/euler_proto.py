@@ -38,7 +38,7 @@ E7 = 10_000_000
 LAT_MAX_E7 = 90 * E7
 LON_MAX_E7 = 180 * E7
 DEC_MAX_E7 = 90 * E7
-RA_MAX_E7 = 360 * E7         # exclusivo. Ver ESPECIFICACION.md, hallazgo H1: no cabe en i32.
+RA_MAX_E7 = 360 * E7         # exclusivo; u32 en el cable (ESPECIFICACION 7, H1 decidido)
 
 # Tolerancia de norma del cuaternion [estimado: tolerancia propuesta, no medida].
 QUAT_NORM_TOL = 1e-3
@@ -185,6 +185,12 @@ class DockRef:
         object.__setattr__(self, "quat", q)
         if any((not isinstance(c, (int, float))) or isinstance(c, bool) or not math.isfinite(c) for c in q):
             raise InvalidField("cuaternion con NaN, infinito o tipo invalido")
+        # Se valida lo que viaja: los cuatro valores redondeados a f32 (lo que el receptor va a leer).
+        try:
+            q = _QUAT_F32.unpack(_QUAT_F32.pack(*(float(c) for c in q)))
+        except OverflowError:
+            raise InvalidField("cuaternion fuera del rango de f32") from None
+        object.__setattr__(self, "quat", q)
         norm = math.sqrt(sum(float(c) * float(c) for c in q))
         if abs(norm - 1.0) > QUAT_NORM_TOL:
             raise InvalidField(f"cuaternion no unitario (norma={norm:.6f})")
@@ -238,6 +244,7 @@ _HB_HEAD = struct.Struct("<BBHHQiiBB")
 _HB_ASG = struct.Struct("<BHIi")
 _DOCK_REQ = struct.Struct("<BBH")
 _DOCK_REF = struct.Struct("<BBHQ4fBB")
+_QUAT_F32 = struct.Struct("<4f")
 _ACK = struct.Struct("<BBH")
 _STATUS = struct.Struct("<BBBBHHB")
 _ASSIGN = struct.Struct("<BBHIi")
@@ -304,6 +311,8 @@ def decode(data: bytes) -> Packet:
         if len(data) < HB_HEADER_SIZE:
             raise TruncatedPacket(f"HB de {len(data)} B, cabecera de {HB_HEADER_SIZE}")
         (_, _, base_id, seq, utc_ms, lat, lon, flags, n) = _HB_HEAD.unpack_from(data, 0)
+        if n > MAX_ASSIGNMENTS:
+            raise InvalidField(f"{n} asignaciones, maximo {MAX_ASSIGNMENTS}")
         _exact(data, HB_HEADER_SIZE + HB_ASSIGNMENT_SIZE * n)
         asg = []
         for i in range(n):

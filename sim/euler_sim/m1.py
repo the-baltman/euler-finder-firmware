@@ -29,9 +29,10 @@ class M1Config:
     ref_max_tries: int = 8            # [estimado] envios de DOCK_REF antes de rendirse
     stars_matched: int = 12           # estrellas emparejadas que reporta el solve falso
     ref_flags: int = p.REF_FLAG_SAMPLE_IMAGE   # corrida 1: la referencia sale de una imagen de ejemplo
-    # Variante A/B (NO es la especificacion): tras un ASSIGN manda tambien un HB fuera de turno, para que el
-    # HB mas nuevo ya traiga la asignacion. Cierra la carrera "HB viejo pisa al ASSIGN" (ESPECIFICACION.md, H3).
-    hb_after_assign: bool = False
+    # Tras cualquier cambio de asignaciones (asignar o quitar) manda tambien un HB fuera de turno, para que el
+    # HB mas nuevo ya traiga la tabla. Cierra la carrera "HB viejo pisa al ASSIGN" (ESPECIFICACION 5.1 y 7, H3).
+    # False solo sirve para medir el defecto que cubre.
+    hb_after_assign: bool = True
     hb_extra_delay_s: float = 0.05    # [estimado] espera para juntar varios ASSIGN seguidos en un solo HB extra
 
 
@@ -84,12 +85,17 @@ class M1Core:
         a = p.Assignment(nx, target_id, ra_e7, dec_e7)
         self.assignments[nx] = a
         self._tx(nx, p.Assign(nx, target_id, ra_e7, dec_e7))
+        self._schedule_extra_hb(now)
+
+    def clear_assignment(self, nx: int, now: float) -> None:
+        """Quita la asignacion. No existe un ASSIGN de borrado: el M2 se entera por el HB (el extra, a los 50 ms)."""
+        self.assignments.pop(nx, None)
+        self._schedule_extra_hb(now)
+
+    def _schedule_extra_hb(self, now: float) -> None:
+        # Varios cambios dentro de la ventana salen en un solo HB; el HB periodico no se corre.
         if self.cfg.hb_after_assign and self._extra_hb_at == math.inf:
             self._extra_hb_at = now + self.cfg.hb_extra_delay_s
-
-    def clear_assignment(self, nx: int) -> None:
-        """Quita la asignacion. No existe un ASSIGN de borrado: el M2 se entera con el siguiente HB."""
-        self.assignments.pop(nx, None)
 
     def set_flags(self, flags: int) -> None:
         p.Heartbeat(0, 0, 0, 0, 0, flags)   # valida los bits
@@ -168,20 +174,19 @@ class M1Core:
 
     def _on_dock_req(self, req: p.DockReq, now: float) -> None:
         d = self.docks.get(req.nx)
-        if d is not None and d.seq == req.seq:
-            # Reintento del mismo acople: se confirma otra vez, pero NO se vuelve a resolver el cielo.
+        activo = d is not None and d.phase in (DockPhase.QUEUED, DockPhase.SOLVING, DockPhase.REF_SENT)
+        if activo and d.seq == req.seq:
+            # Reintento del acople en curso: se confirma otra vez, pero NO se vuelve a resolver el cielo.
             self._tx(req.nx, p.Ack(req.nx, req.seq))
-            if d.phase is DockPhase.FAILED:
-                d.phase, d.tries = DockPhase.QUEUED, 0
-                self._queue.append(d)
             return
-        if d is not None:
-            if p.seq_delta(req.seq, d.seq) > 0x8000:
-                self.rejected["old_dock_req"] = self.rejected.get("old_dock_req", 0) + 1
-                return                               # DOCK_REQ viejo que llego tarde: ya hay uno mas nuevo
-            # Acople nuevo del mismo M2: el anterior se descarta, este donde este.
-            if d in self._queue:
-                self._queue.remove(d)
+        if activo and p.seq_delta(req.seq, d.seq) > 0x8000:
+            # DOCK_REQ mas viejo que el acople en curso (llego tarde): se ignora.
+            self.rejected["old_dock_req"] = self.rejected.get("old_dock_req", 0) + 1
+            return
+        # Sin acople, acople cerrado (DONE/FAILED, con cualquier secuencia: un M2 reiniciado vuelve a contar)
+        # o secuencia mas nueva que la del acople en curso: acople nuevo; el anterior se descarta.
+        if d is not None and d in self._queue:
+            self._queue.remove(d)
         nd = _Dock(req.nx, req.seq)
         self.docks[req.nx] = nd
         self._queue.append(nd)

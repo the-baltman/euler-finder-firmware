@@ -172,9 +172,20 @@ def test_hb_cuyo_n_no_coincide_con_el_largo():
 
 
 def test_hb_con_n_255_no_desborda():
+    # n > 10 se rechaza ANTES de calcular 24 + 11*n: en C++ ese producto desborda un u8 y el bucle escribiria
+    # fuera del arreglo de 10 asignaciones (ESPEC. 4, regla 4).
     data = bytearray(p.encode(hb(0)))
     data[23] = 255
-    with pytest.raises(p.TruncatedPacket):
+    with pytest.raises(p.InvalidField):
+        p.decode(bytes(data))
+
+
+@pytest.mark.parametrize("n", [11, 24, 255])
+def test_hb_con_n_mayor_que_10_es_invalido_aunque_el_largo_cuadre(n):
+    data = bytearray(p.encode(hb(10))) + bytes(11 * (n - 10))
+    data[23] = n
+    assert len(data) == 24 + 11 * n
+    with pytest.raises(p.InvalidField):
         p.decode(bytes(data))
 
 
@@ -228,3 +239,24 @@ def test_la_ventana_de_atraso_es_de_8_hb_segun_la_especificacion():
     assert p.SEQ_STALE_WINDOW == 8
     assert p.seq_is_stale_or_dup(92, 100)        # 8 atras: atrasado
     assert not p.seq_is_stale_or_dup(91, 100)    # 9 atras: se toma como M1 reiniciado
+
+
+# --- C3: el codificador no acepta lo que el decodificador rechaza (norma sobre los f32 que viajan) ---
+
+def test_todo_dock_ref_construible_sobrevive_a_ida_y_vuelta_junto_a_la_tolerancia():
+    construidos = rechazados = 0
+    for k in range(20_000):
+        w = 1.0 + p.QUAT_NORM_TOL - k * 1e-11            # pegado al borde de la tolerancia de norma
+        try:
+            r = p.DockRef(1, 0, 0, (w, 0.0, 0.0, 0.0), 5, 0)
+        except p.InvalidField:
+            rechazados += 1
+            continue
+        construidos += 1
+        assert p.decode(p.encode(r)) == r
+    assert construidos > 0 and rechazados > 0            # la prueba cruza el borde: no es vacua
+
+
+def test_cuaternion_fuera_del_rango_de_f32_es_invalid_field_no_overflow():
+    with pytest.raises(p.InvalidField):
+        p.DockRef(1, 0, 0, (1e39, 0.0, 0.0, 0.0), 5, 0)

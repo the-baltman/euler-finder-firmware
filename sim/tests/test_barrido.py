@@ -42,7 +42,7 @@ def test_sin_perdida_todo_es_exacto(sin_perdida):
     assert r["docks_done_min"] == 10 and r["m1_docks_done_min"] == 10
     assert 20.0 <= r["dock_time_max_s"] < 21.0           # 10 solves en fila x 2 s
     assert r["settle_assign_max_s"] <= 2 * POLL_S        # ASSIGN inmediato: se mide con paso de 0.25 s
-    assert r["settle_clear_max_s"] <= 10.0 + POLL_S      # sin ASSIGN de borrado: espera un HB
+    assert r["settle_clear_max_s"] <= 2 * POLL_S         # sin ASSIGN de borrado, pero el HB extra sale a los 50 ms
     assert r["unsettled_total"] == 0 and r["final_ok"] == N_SEMILLAS
     assert r["base_lost_mean"] == 0.0
 
@@ -60,9 +60,9 @@ def test_invariantes_que_valen_con_cualquier_perdida(red_tipica, desorden_extrem
 
 
 @pytest.mark.parametrize("loss,acoples_min,dock_max,asig_max,borrado_max", [
-    (0.05, 10, 25.0, 40.0, 25.0),
-    (0.1, 10, 26.0, 25.0, 25.0),
-    (0.2, 10, 28.0, 30.0, 40.0),
+    (0.05, 10, 25.0, 6.0, 12.0),       # maximos del barrido de 24 semillas con HB extra: 21.0 / 2.75 / 8.5 s
+    (0.1, 10, 26.0, 10.0, 10.0),       # 22.2 / 6.5 / 6.5 s
+    (0.2, 10, 28.0, 10.0, 10.0),       # 23.0 / 6.5 / 6.5 s
 ])
 def test_perdida_moderada_todos_acoplan_y_las_asignaciones_convergen(red_tipica, loss, acoples_min, dock_max,
                                                                        asig_max, borrado_max):
@@ -112,4 +112,5 @@ def test_el_instrumento_puede_fallar_con_la_red_muerta():
     assert r["base_lost_events"] == 10                   # cada M2 declara "sin base" una vez
     r0 = run_full(0, 0.0)
     assert r0["n_events"] == 16                          # 10 asignaciones + 5 reasignaciones + 1 borrado
-    assert r0["hb_sent"] == 25                           # t=0,10,...,240
+    assert r0["hb_sent"] == 28                           # 25 ordinarios (t=0,10,...,240) + 3 extra (asignar, reasignar, quitar)
+    assert run_full(0, 0.0, hb_after_assign=False)["hb_sent"] == 25

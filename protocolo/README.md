@@ -2,17 +2,17 @@
 
 | Archivo | Qué es |
 |---|---|
-| `ESPECIFICACION.md` | Formato de cada paquete (little-endian, tamaños exactos), reglas de rechazo, comportamiento y hallazgos abiertos |
+| `ESPECIFICACION.md` | Formato de cada paquete (little-endian, tamaños exactos), reglas de rechazo, comportamiento y decisiones del arbitraje |
 | `euler_proto.py` | Codec de referencia en Python: `encode` / `decode`; rechaza truncados, tipo desconocido, versión distinta, bytes de más y campos fuera de rango |
 | `vectores_dorados.txt` | Paquetes válidos e inválidos armados a mano, byte por byte; los leen estas pruebas y deben leerlos las del M2 (C++) |
 | `tests/` | Pruebas `pytest` del codec y de los vectores |
 
 ## Probar (sin hardware)
 
-Requiere Python 3.11 y `pytest`. Desde la raíz del repo:
+Requiere Python 3.11 y `pytest` (versión fijada en `requirements-dev.txt`). Desde la raíz del repo:
 
 ```
-pip install pytest
+pip install -r requirements-dev.txt
 python -m pytest protocolo -q
 ```
 
