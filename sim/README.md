@@ -37,7 +37,7 @@ python -m euler_sim sweep --seeds 24
 
 ## Cifras del barrido [estimado: simulador, no medido]
 
-`python -m euler_sim sweep --seeds 24` (la primera fila sale de `--reorder 0 --losses 0`; 24 semillas por fila, 10 M2; desorden del 20 % de los paquetes con hasta 3 s de retraso salvo la primera fila; **con el HB extra a los 50 ms**, que es la especificación). Los 10 M2 piden acople a la vez en t = 20 s (el que aún no oyó un HB reintenta cada 0.25 s: sin HB no hay `DOCK_REQ`) y el solve falso dura 2 s, así que 20 s es el mínimo posible. Los máximos son los del barrido, no promedios:
+`python -m euler_sim sweep --seeds 24` (la primera fila sale de `--reorder 0 --losses 0`; 24 semillas por fila, 10 M2; desorden del 20 % de los paquetes con hasta 3 s de retraso salvo la primera fila; **con el HB extra a los 50 ms**, que es la especificación). Los 10 M2 piden acople a la vez en t = 20 s (el que aún no oyó un HB reintenta cada 0.25 s: sin HB no hay `DOCK_REQ`) y el solve falso dura 2 s, así que 20 s es el mínimo posible. «Acople más lento» va del `DOCK_REQ` aceptado a `DONE`; no incluye la espera al primer HB del M2 que todavía no oía ninguno. Los máximos son los del barrido, no promedios:
 
 | Pérdida | Acoples completos (mínimo de 10) | Acople más lento | Asignación asentada (máx.) | Borrado asentado (máx.) | Estado final correcto |
 |---|---|---|---|---|---|
@@ -53,7 +53,7 @@ Con desorden de hasta 15 s (dos HB consecutivos pueden cruzarse) y 20 % de pérd
 
 Referencia sin HB extra (`--sin-hb-extra`, mismo código): asignación máx. 26.50 s (5 %), 16.50 s (10 %), 18.00 s (20 %); borrado máx. 8.50 s (5 %), 16.50 s (10 %), 16.50 s (20 %), 77.25 s (50 %). Las cifras de la tabla anterior (commit `ba8731a`, sin HB extra y con el borrado a 27.0 s al 20 %) quedan superadas por esta corrida.
 
-Lectura: el acople aguanta hasta 30 % de pérdida con los 10 M2 a la vez; con 50 % algún M2 agota sus 8 reintentos. El HB extra no cambia los acoples (la corrida `--sin-hb-extra` da los mismos); lo que baja es el tiempo de asentamiento de una asignación o de un borrado hasta el siguiente HB que llegue, de 16-18 s a 6.5 s con 10-20 % de pérdida. Con 30 % o más domina la pérdida de los propios HB y casi no cambia. Que los acoples sean ahora más (10 contra 9 al 30 %) viene de las reglas R1, R2 y R5 del retrabajo, no del HB extra.
+Lectura: el acople aguanta hasta 30 % de pérdida con los 10 M2 a la vez (72 semillas más, de la 24 a la 95, también dan mínimo 10 al 20 y al 30 %); con 50 % algún M2 agota sus 8 reintentos (mínimo 7 en las semillas 24-95). El HB extra no cambia los acoples (la corrida `--sin-hb-extra` da los mismos). Lo que cambia es el caso típico: si llega el `ASSIGN` o el HB extra, el M2 se entera en menos de 0.25 s. El peor caso no lo acota el HB extra: si se pierden el `ASSIGN`, el HB extra y k HB periódicos seguidos, el M2 espera k + 1 periodos de 10 s. Por eso los máximos de la tabla son de estas 24 semillas y no una cota: con 20 % de pérdida, las semillas 0-23 dan 6.50 s y las semillas 24-95 dan 26.50 s (asignación) y 27.75 s (borrado). Que el mínimo de acoples al 30 % pase de 9 (commit `ba8731a`) a 10 no se atribuye a una regla concreta: el escenario cambió (el botón se repite hasta tener base, R5) y con él la secuencia de pérdidas de cada semilla.
 
 Los parámetros del simulador (solve de 2 s, reintentos a 1 s, 8 intentos, latencia de 5 ms) son supuestos, no mediciones; el tiempo real del solve se mide en el Hito 1.
 
