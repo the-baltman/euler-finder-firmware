@@ -110,7 +110,7 @@ MUTANTS = [
      "if (held >= tun::kLongPressMs) {\n      a_.long_fired", "if (held >= 500) {\n      a_.long_fired", ["buttons"]),
     # --- autoprueba ---
     ("autoprueba: ignora giroscopio muerto", "core/selftest.cpp",
-     "|| !any_gyro_nonzero) {", "|| false) {", ["selftest"]),
+     "|| !any_gyro_nonzero) {", "|| (any_gyro_nonzero && false)) {", ["selftest"]),
     ("autoprueba: ignora gravedad absurda", "core/selftest.cpp",
      "g >= tun::kSelfTestGravMin && g <= tun::kSelfTestGravMax", "g >= 0.0f && g <= 100.0f", ["selftest"]),
     ("autoprueba: todo ID es conocido", "core/selftest.cpp",
