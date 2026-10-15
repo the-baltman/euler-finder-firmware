@@ -93,6 +93,8 @@ Si la pantalla elige el montaje equivocado (plano vs vertical), tambien es sinto
 
 La primera vez, aprovecha para comprobar la autoprueba: en el monitor sale `[autoprueba] ok=1 id=0x71 ...`. Un `id` distinto con `ok=1` es un posible clon (la pantalla lo avisa y el equipo sigue). `0x71` es lo esperado para el MPU-9250 [por verificar].
 
+Prueba de botones: con el monitor abierto, pulsa A y B. El monitor imprime `[botones] A=0 B=1` (0 = pulsado, 1 = en reposo) cada vez que cambia el estado de alguno.
+
 ## 5. Medir las marcas y escribir `marcas.h`
 
 Archivo: `m2/src/config/marcas.h`. Cada marca se mide **relativa a la marca 1**, desde el punto exacto donde va a quedar el nivelador en la demo.

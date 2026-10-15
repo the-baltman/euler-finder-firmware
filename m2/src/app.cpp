@@ -25,6 +25,7 @@ AppFsm g_fsm;
 UiModel g_published;
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t g_heartbeat = 0;
+bool g_btn_a_logged = false, g_btn_b_logged = false;
 
 int g_imu_fail = 0;
 int64_t g_last_us = 0;
@@ -45,6 +46,11 @@ void tick(TickType_t* last_wake) {
   }
 #endif
   BtnOut b = g_buttons.update(now, digitalRead(pins::kBtnA) == LOW, digitalRead(pins::kBtnB) == LOW);
+  if (b.a_down != g_btn_a_logged || b.b_down != g_btn_b_logged) {  // prueba 9 de la nota de electronica
+    g_btn_a_logged = b.a_down;
+    g_btn_b_logged = b.b_down;
+    Serial.printf("[botones] A=%d B=%d\n", digitalRead(pins::kBtnA), digitalRead(pins::kBtnB));
+  }
 
   if (g_fsm.wantsSelfTest()) {
     SelfTestResult r = selfTestImu(g_imu, sleepMs);  // bloquea ~0.4 s; el TWDT del loop es de 5 s (CONFIG_ESP_TASK_WDT_TIMEOUT_S)
