@@ -179,7 +179,7 @@ Notas de uso:
 | **"Posible clon (ID xx)"** | El chip contesta con un ID distinto de los conocidos pero con datos creibles: el equipo sigue funcionando; ojo con que el comportamiento puede variar. |
 | **Se queda en "Midiendo"** | Se esta moviendo. Apoyalo quieto (a los 8 s sale el aviso "Apoyalo quieto"). |
 | **No flashea** | BOOT al conectar el USB (seccion 3), cable USB con datos (no solo carga), SW1 en OFF. |
-| **Se reinicia solo** | Salida serie `[error] la tarea de control no responde, reiniciando`: el firmware se reinicia a si mismo (watchdog) cuando la tarea de control se cuelga. Guarda el mensaje y avisa. |
+| **Se reinicia solo** | La tarea de control se colgo y el equipo se reinicia solo. Si se bloqueo, sale `[error] la tarea de control no responde, reiniciando` (la vigilancia del loop, a los 3 s). Si se quedo en un bucle activo, sale `Task watchdog got triggered` (el TWDT del SDK, a los 5 s). Guarda el mensaje y avisa. [por verificar en banco: ver la prueba de cuelgue en la seccion 8] |
 | **El monitor no muestra nada** | Reabre el monitor despues de reiniciar la placa (el puerto USB se reconecta). |
 
 ## 8. Pruebas en la computadora (sin hardware)
@@ -190,6 +190,14 @@ python m2/test/host/run_host_tests.py     # 7 pruebas, deben pasar todas
 python m2/test/host/mutate.py             # rompe el codigo a proposito: todos los mutantes deben morir
 ```
 Necesitan un compilador de C++ (g++) en el PATH.
+
+### Prueba de cuelgue (con la placa) [por verificar en banco]
+
+Comprueba que el equipo se reinicia solo si la tarea de control se cuelga. Hay dos entornos de prueba; cada uno se cuelga a proposito a los 15 s del arranque.
+
+1. Bloqueo de la tarea: `python -m platformio run -d m2 -e prueba-cuelgue -t upload`. Con el monitor abierto, a unos 18 s debe salir `[error] la tarea de control no responde, reiniciando` y volver el logo.
+2. Bucle activo: `python -m platformio run -d m2 -e prueba-cuelgue-activo -t upload`. A unos 20 s debe salir `Task watchdog got triggered` (panic del SDK) y volver el logo.
+3. Al terminar, vuelve a flashear el entorno normal: `python -m platformio run -d m2 -t upload`. Los entornos de prueba no se dejan en el equipo de la demo.
 
 ## 9. Mapa de archivos
 

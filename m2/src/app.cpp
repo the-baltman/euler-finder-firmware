@@ -35,10 +35,19 @@ void sleepMs(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
 
 void tick(TickType_t* last_wake) {
   const uint32_t now = millis();
+#ifdef EULER_PRUEBA_CUELGUE
+  if (now > 15000) {
+#if EULER_PRUEBA_CUELGUE == 2
+    for (;;) {}                          // bucle activo: lo corta el TWDT (5 s)
+#else
+    for (;;) vTaskDelay(portMAX_DELAY);  // bloqueo: lo detecta la vigilancia del loop (3 s)
+#endif
+  }
+#endif
   BtnOut b = g_buttons.update(now, digitalRead(pins::kBtnA) == LOW, digitalRead(pins::kBtnB) == LOW);
 
   if (g_fsm.wantsSelfTest()) {
-    SelfTestResult r = selfTestImu(g_imu, sleepMs);  // bloquea ~0.4 s; el watchdog de la UI tolera 2 s
+    SelfTestResult r = selfTestImu(g_imu, sleepMs);  // bloquea ~0.4 s; el TWDT del loop es de 5 s (CONFIG_ESP_TASK_WDT_TIMEOUT_S)
     g_fsm.setSelfTest(r, millis());
     Serial.printf("[autoprueba] ok=%d id=0x%02X conocido=%d fatal=%d\n", r.ok, r.who_am_i, r.id_known,
                   static_cast<int>(r.fatal));
