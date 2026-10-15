@@ -73,6 +73,11 @@ void tick(TickType_t* last_wake) {
     if (g_imu.read(s) == ImuStatus::Ok) {
       g_imu_fail = 0;
       bool window_done = g_bias.feed(s.gyro_dps, s.accel_g);
+      if (window_done) {  // medicion de deriva en banco: sesgo aceptado y media cruda de la ventana (antes de la cota)
+        Vec3 bs = g_bias.biasDps(), rw = g_bias.rawWindowMeanDps();
+        Serial.printf("[sesgo] t=%lu bias=%.4f,%.4f,%.4f crudo=%.4f,%.4f,%.4f\n", static_cast<unsigned long>(now), bs.x, bs.y,
+                      bs.z, rw.x, rw.y, rw.z);
+      }
       if (ph == Phase::Bias) {
         g_fsm.biasProgress(g_bias.progress());
         if (window_done) {

@@ -136,10 +136,44 @@ static void testSlowPanIsNotAbsorbed() {
       }
       double e = std::fabs(gb.biasDps().z - b.z);
       if (e > worst) worst = e;
-      CHECK(e <= tun::kBiasMaxStepDps + 0.02);
+      CHECK(e <= 0.04);  // absoluto: una cota demasiado grande tiene que fallar aqui
+      if (pan <= 6.0) CHECK_NEAR(gb.rawWindowMeanDps().z, b.z + pan, 0.05);  // la media cruda no se acota (con norma > kBiasMaxDps la ventana se rechaza)
     }
   }
   std::printf("  paneo lento 0.5..8.5 dps durante 3 s: peor error del sesgo %.4f dps (%d semillas x 17 velocidades) [estimado: simulador]\n",
+              worst, kSeeds);
+}
+
+// Paneo parejo LARGO: la cota es por ventana y se acumula. Presupuesto: 10 s de paneo y 4 s quieto con error de
+// rumbo <= 1° (la mitad del umbral de EN MIRA). Es el techo de kBiasMaxStepDps.
+static void testLongPanHeadingBudget() {
+  const double dt = 1.0 / tun::kSampleHz;
+  double worst = 0;
+  for (int seed = 1; seed <= kSeeds; seed++) {
+    for (int k = 1; k <= 17; k++) {
+      double pan = 0.5 * k;  // 0.5 .. 8.5 °/s
+      std::mt19937 r(seed);
+      Vec3 b = randBias(r);
+      Src s(seed, b);
+      GyroBias gb;
+      for (int i = 0; i < 300; i++) {
+        Vec3 g, a;
+        s.sample(&g, &a);
+        gb.feed(g, a);
+      }
+      CHECK(gb.valid());
+      double head = 0;  // error de rumbo acumulado por el sesgo mal estimado (eje z)
+      for (int i = 0; i < 1400; i++) {  // 10 s paneando + 4 s quieto
+        Vec3 g, a;
+        s.sample(&g, &a, {0, 0, static_cast<float>(i < 1000 ? pan : 0.0)});
+        gb.feed(g, a);
+        head += (b.z - gb.biasDps().z) * dt;
+      }
+      if (std::fabs(head) > worst) worst = std::fabs(head);
+      CHECK(std::fabs(head) <= 1.0);
+    }
+  }
+  std::printf("  paneo parejo de 10 s y 4 s quieto: peor error de rumbo %.2f grados (%d semillas x 17 velocidades) [estimado: simulador]\n",
               worst, kSeeds);
 }
 
@@ -197,6 +231,7 @@ int main() {
   testRefreshAfterValid();
   testSlowPanIsNotAbsorbed();
   testSlowDriftIsTracked();
+  testLongPanHeadingBudget();
   testProgressAndReset();
   return reportAndExit("test_bias");
 }

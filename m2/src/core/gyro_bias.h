@@ -13,6 +13,7 @@ class GyroBias {
   bool valid() const { return valid_; }
   Vec3 biasDps() const { return bias_; }
   Vec3 meanAccelG() const { return mean_accel_; }  // media de la última ventana aceptada
+  Vec3 rawWindowMeanDps() const { return raw_mean_; }  // media cruda de la última ventana quieta, antes de la cota
   float progress() const;                          // 0..1 de la ventana en curso
 
  private:
@@ -21,6 +22,7 @@ class GyroBias {
   bool valid_ = false;
   Vec3 bias_{};
   Vec3 mean_accel_{};
+  Vec3 raw_mean_{};
   Vec3 sum_g_{}, sum_a_{}, ref_g_{}, ref_a_{};
   int n_ = 0;
 };

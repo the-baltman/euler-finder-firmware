@@ -2,7 +2,6 @@
 """Compila y corre las pruebas de host (g++ -std=c++17). Uso:
     python test/host/run_host_tests.py            # todas
     python test/host/run_host_tests.py fusion     # una (por nombre sin test_)
-Variables: SRC_ROOT (por defecto ../../src) permite apuntar a una copia mutada (lo usa mutate.py).
 """
 import os
 import subprocess

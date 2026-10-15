@@ -203,6 +203,15 @@ Comprueba que el equipo se reinicia solo si la tarea de control se cuelga. Hay d
 2. Bucle activo: `python -m platformio run -d m2 -e prueba-cuelgue-activo -t upload`. A unos 20 s debe salir `Task watchdog got triggered` (panic del SDK) y volver el logo.
 3. Al terminar, vuelve a flashear el entorno normal: `python -m platformio run -d m2 -t upload`. Los entornos de prueba no se dejan en el equipo de la demo.
 
+### Medir la deriva del sesgo (con la placa) [por verificar en banco]
+
+Sirve para fijar `kBiasMaxStepDps` en `m2/src/config/tuning.h`. Con el entorno normal flasheado y el monitor abierto:
+
+1. Enciende el equipo y dejalo quieto sobre la mesa 10 min, sin tocarlo.
+2. Cada vez que termina una ventana quieta (unos 2 s) sale `[sesgo] t=... bias=x,y,z crudo=x,y,z`. `crudo` es lo que midio la ventana; `bias` es lo que el equipo acepto despues de la cota.
+3. Guarda el log completo en la bitacora. La deriva por ventana es la diferencia de `crudo` entre dos lineas seguidas: anota la mayor de todo el registro y la mayor desde el minuto 2.
+4. Si 3 veces esa deriva cabe en 0.02 grados/s, `kBiasMaxStepDps` se queda en 0.02. Si no cabe, no la subas: avisa. Subirla rompe el presupuesto de paneo (`testLongPanHeadingBudget` en `test_bias.cpp`).
+
 ## 9. Mapa de archivos
 
 | Que | Donde |

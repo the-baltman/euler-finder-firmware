@@ -38,6 +38,10 @@ MUTANTS = [
     # --- sesgo del giroscopio ---
     ("sesgo: sin cota al paso de la re-estimacion (absorbe giro lento)", "core/gyro_bias.cpp",
      "if (sn > tun::kBiasMaxStepDps) mean = bias_ + step * (tun::kBiasMaxStepDps / sn);", "(void)sn;", ["bias"]),
+    ("sesgo: cota al paso demasiado grande (0.1)", "config/tuning.h",
+     "kBiasMaxStepDps = 0.02f", "kBiasMaxStepDps = 0.1f", ["bias"]),
+    ("sesgo: no guarda la media cruda de la ventana (log de banco)", "core/gyro_bias.cpp",
+     "  raw_mean_ = mean;", "  (void)0;", ["bias"]),
     ("sesgo: acepta giro constante como sesgo", "core/gyro_bias.cpp",
      "if (norm(mean) > tun::kBiasMaxDps) return false;", "if (false) return false;", ["bias"]),
     ("sesgo: el movimiento no reinicia la ventana", "core/gyro_bias.cpp",
