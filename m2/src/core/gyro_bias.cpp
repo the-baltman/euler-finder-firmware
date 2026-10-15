@@ -47,6 +47,13 @@ bool GyroBias::feed(Vec3 g, Vec3 a) {
   Vec3 mean_a = sum_a_ * (1.0f / n_);
   restartWindow();
   if (norm(mean) > tun::kBiasMaxDps) return false;  // giraba a velocidad constante: no es sesgo
+  if (valid_) {
+    // Un giro lento y parejo (base giratoria) pasa la prueba de quietud y no se distingue del sesgo.
+    // El sesgo real deriva despacio (temperatura): se acepta el cambio, acotado por ventana.
+    Vec3 step = mean - bias_;
+    float sn = norm(step);
+    if (sn > tun::kBiasMaxStepDps) mean = bias_ + step * (tun::kBiasMaxStepDps / sn);
+  }
   bias_ = mean;
   mean_accel_ = mean_a;
   valid_ = true;

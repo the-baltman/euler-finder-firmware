@@ -36,6 +36,8 @@ MUTANTS = [
     ("fusion: update sin inicializar integra", "core/fusion.cpp",
      "  if (!init_) return;\n  float an", "  float an", ["fusion"]),
     # --- sesgo del giroscopio ---
+    ("sesgo: sin cota al paso de la re-estimacion (absorbe giro lento)", "core/gyro_bias.cpp",
+     "if (sn > tun::kBiasMaxStepDps) mean = bias_ + step * (tun::kBiasMaxStepDps / sn);", "(void)sn;", ["bias"]),
     ("sesgo: acepta giro constante como sesgo", "core/gyro_bias.cpp",
      "if (norm(mean) > tun::kBiasMaxDps) return false;", "if (false) return false;", ["bias"]),
     ("sesgo: el movimiento no reinicia la ventana", "core/gyro_bias.cpp",

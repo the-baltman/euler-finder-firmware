@@ -86,24 +86,90 @@ static void testImplausibleGravityNeverStarts() {
 }
 
 static void testRefreshAfterValid() {
-  Src s(3, {1.0f, 1.0f, 1.0f});
-  GyroBias gb;
-  for (int i = 0; i < 300; i++) {
-    Vec3 g, a;
-    s.sample(&g, &a);
-    gb.feed(g, a);
+  // Un cambio menor que la cota (kBiasMaxStepDps) se sigue en una sola ventana de 2 s.
+  double worst = 0;
+  for (int seed = 1; seed <= kSeeds; seed++) {
+    Src s(seed, {1.0f, 1.0f, 1.0f});
+    GyroBias gb;
+    for (int i = 0; i < 300; i++) {
+      Vec3 g, a;
+      s.sample(&g, &a);
+      gb.feed(g, a);
+    }
+    CHECK(gb.valid());
+    s.bias = {1.03f, 1.0f, 0.97f};  // el sesgo cambió (temperatura): 0.042 dps, bajo la cota
+    int done_at = -1;
+    for (int i = 1; i <= 300; i++) {
+      Vec3 g, a;
+      s.sample(&g, &a);
+      if (gb.feed(g, a) && done_at < 0) done_at = i;
+    }
+    CHECK(done_at == static_cast<int>(tun::kBiasRefreshWindowS * tun::kSampleHz));  // ventana de 2 s
+    double e = norm(gb.biasDps() - s.bias);
+    if (e > worst) worst = e;
+    CHECK_NEAR(gb.biasDps().x, 1.03, 0.03);
+    CHECK_NEAR(gb.biasDps().z, 0.97, 0.03);
   }
-  CHECK(gb.valid());
-  s.bias = {2.0f, 0.0f, -1.0f};  // el sesgo cambió (temperatura)
-  int done_at = -1;
-  for (int i = 1; i <= 300; i++) {
-    Vec3 g, a;
-    s.sample(&g, &a);
-    if (gb.feed(g, a) && done_at < 0) done_at = i;
+  std::printf("  re-estimacion tras un cambio de 0.042 dps: peor error %.4f dps (%d semillas) [estimado: simulador]\n", worst, kSeeds);
+}
+
+// Un giro lento y parejo en yaw pasa la prueba de quietud; la cota al paso impide que se absorba como sesgo.
+static void testSlowPanIsNotAbsorbed() {
+  double worst = 0;
+  for (int seed = 1; seed <= kSeeds; seed++) {
+    for (int k = 1; k <= 17; k++) {
+      double pan = 0.5 * k;  // 0.5 .. 8.5 °/s
+      std::mt19937 r(seed);
+      Vec3 b = randBias(r);
+      Src s(seed, b);
+      GyroBias gb;
+      for (int i = 0; i < 300; i++) {
+        Vec3 g, a;
+        s.sample(&g, &a);
+        gb.feed(g, a);
+      }
+      CHECK(gb.valid());
+      for (int i = 0; i < 300; i++) {
+        Vec3 g, a;
+        s.sample(&g, &a, {0, 0, static_cast<float>(pan)});
+        gb.feed(g, a);
+      }
+      double e = std::fabs(gb.biasDps().z - b.z);
+      if (e > worst) worst = e;
+      CHECK(e <= tun::kBiasMaxStepDps + 0.02);
+    }
   }
-  CHECK(done_at == static_cast<int>(tun::kBiasRefreshWindowS * tun::kSampleHz));  // ventana de 2 s
-  CHECK_NEAR(gb.biasDps().x, 2.0, 0.05);
-  CHECK_NEAR(gb.biasDps().z, -1.0, 0.05);
+  std::printf("  paneo lento 0.5..8.5 dps durante 3 s: peor error del sesgo %.4f dps (%d semillas x 17 velocidades) [estimado: simulador]\n",
+              worst, kSeeds);
+}
+
+// La deriva térmica lenta (0.02 dps por ventana, 60 s) sí se sigue.
+static void testSlowDriftIsTracked() {
+  double worst = 0;
+  for (int seed = 1; seed <= kSeeds; seed++) {
+    std::mt19937 r(seed);
+    Vec3 b0 = randBias(r);
+    Src s(seed, b0);
+    GyroBias gb;
+    for (int i = 0; i < 300; i++) {
+      Vec3 g, a;
+      s.sample(&g, &a);
+      gb.feed(g, a);
+    }
+    CHECK(gb.valid());
+    const double per_sample = 0.02 / (tun::kBiasRefreshWindowS * tun::kSampleHz);  // dps por muestra
+    for (int i = 1; i <= 6000; i++) {  // 60 s
+      s.bias.z = static_cast<float>(b0.z + per_sample * i);
+      Vec3 g, a;
+      s.sample(&g, &a);
+      if (gb.feed(g, a)) {
+        double e = std::fabs(gb.biasDps().z - s.bias.z);
+        if (e > worst) worst = e;
+        CHECK(e <= 0.05);
+      }
+    }
+  }
+  std::printf("  deriva de 0.02 dps por ventana durante 60 s: peor error del sesgo %.4f dps (%d semillas) [estimado: simulador]\n", worst, kSeeds);
 }
 
 static void testProgressAndReset() {
@@ -129,6 +195,8 @@ int main() {
   testConstantRotationIsNotBias();
   testImplausibleGravityNeverStarts();
   testRefreshAfterValid();
+  testSlowPanIsNotAbsorbed();
+  testSlowDriftIsTracked();
   testProgressAndReset();
   return reportAndExit("test_bias");
 }

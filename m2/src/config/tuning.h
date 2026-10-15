@@ -22,6 +22,7 @@ constexpr float kBiasRefreshWindowS = 2.0f;  // s quieto para re-estimar despué
 constexpr float kBiasQuietGyroDps = 1.0f;    // °/s, desviación máxima respecto a la primera muestra de la ventana [estimado]
 constexpr float kBiasQuietAccelG = 0.05f;    // g, idem para el acelerómetro [estimado]
 constexpr float kBiasMaxDps = 10.0f;         // °/s, un "sesgo" mayor se descarta (no estaba quieto) [estimado]
+constexpr float kBiasMaxStepDps = 0.05f;     // °/s, cambio máximo del sesgo por re-estimación [estimado; fijar con la deriva medida en banco]
 
 // --- Sync ---
 constexpr int kSyncAvgSamples = 20;  // muestras (0.2 s) que se promedian al confirmar el sync
