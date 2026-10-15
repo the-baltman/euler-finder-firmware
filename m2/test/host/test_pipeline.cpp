@@ -1,5 +1,5 @@
 // Integración de punta a punta con IMU simulado: sesgo -> montaje -> fusión -> sync -> guía -> EN MIRA.
-// 24 semillas x 2 montajes. Los ruidos y sesgos son supuestos de simulación [simulado]: las cifras
+// 24 semillas x 2 montajes. Los ruidos y sesgos son supuestos de simulación [estimado: simulador]: las cifras
 // que imprime son del simulador, NO del sensor real ni del sistema.
 #include <vector>
 #include "check.h"
@@ -164,7 +164,7 @@ int main() {
       CHECK(s.d_giro > 4.0 && s.d_giro < 8.0);
     }
   }
-  std::printf("  punta a punta (sesgo, montaje, fusion, sync, guia): EN MIRA en %d de %d corridas; peor error del apuntado estimado %.3f grados (%d semillas x 2 montajes) [simulado, supuestos de ruido y sesgo del simulador]\n",
+  std::printf("  punta a punta (sesgo, montaje, fusion, sync, guia): EN MIRA en %d de %d corridas; peor error del apuntado estimado %.3f grados (%d semillas x 2 montajes) [estimado: simulador, supuestos de ruido y sesgo del simulador]\n",
               in_view, total, worst_err, kSeeds);
   return reportAndExit("test_pipeline");
 }

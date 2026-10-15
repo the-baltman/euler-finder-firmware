@@ -155,7 +155,7 @@ static void testSyncAverage() {
     if (e_az > worst) worst = e_az;
     CHECK(e_az < 0.35 && e_el < 0.35);  // sigma 0.5 / sqrt(20) = 0.11
   }
-  std::printf("  error del sync tras promediar 20 muestras de sigma 0.5: peor caso %.3f grados (24 semillas) [simulado]\n", worst);
+  std::printf("  error del sync tras promediar 20 muestras de sigma 0.5: peor caso %.3f grados (24 semillas) [estimado: simulador]\n", worst);
   // Solo cuentan las últimas 20: las viejas no contaminan.
   Sync s;
   for (int i = 0; i < 30; i++) s.push({90, 40});

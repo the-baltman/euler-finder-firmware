@@ -79,7 +79,7 @@ static void testConvergenceFromTiltError() {
     if (err > worst) worst = err;
     CHECK(err < 0.5);
   }
-  std::printf("  convergencia desde 25 grados de error: peor caso %.3f grados (%d semillas) [simulado]\n", worst, kSeeds);
+  std::printf("  convergencia desde 25 grados de error: peor caso %.3f grados (%d semillas) [estimado: simulador]\n", worst, kSeeds);
 }
 
 // Una ráfaga de aceleración lineal (1.6 g) no debe inclinar la estimación.
@@ -132,7 +132,7 @@ static void testAzimuthTracking() {
       CHECK(e_az < 2.0);
     }
   }
-  std::printf("  seguimiento 20 s con movimiento (sesgo compensado): peor altura %.3f, peor rumbo %.3f grados (%d semillas x 2 montajes) [simulado]\n",
+  std::printf("  seguimiento 20 s con movimiento (sesgo compensado): peor altura %.3f, peor rumbo %.3f grados (%d semillas x 2 montajes) [estimado: simulador]\n",
               worst_el, worst_az, kSeeds);
 }
 

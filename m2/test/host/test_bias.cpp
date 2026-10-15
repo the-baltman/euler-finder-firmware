@@ -11,7 +11,7 @@ constexpr int kSeeds = 24;
 struct Src {
   std::mt19937 rng;
   Vec3 bias;
-  double sg = 0.1, sa = 0.003;  // [simulado]
+  double sg = 0.1, sa = 0.003;  // [estimado: simulador]
   explicit Src(unsigned seed, Vec3 b) : rng(seed), bias(b) {}
   void sample(Vec3* g, Vec3* a, Vec3 extra = {0, 0, 0}) {
     std::normal_distribution<double> n(0, 1);
@@ -48,7 +48,7 @@ static void testQuietWindowGivesBias() {
     CHECK(e < 0.05);
     CHECK_NEAR(norm(gb.meanAccelG()), 1.0, 0.01);
   }
-  std::printf("  error del sesgo tras 3 s quieto: peor caso %.4f dps (%d semillas) [simulado]\n", worst, kSeeds);
+  std::printf("  error del sesgo tras 3 s quieto: peor caso %.4f dps (%d semillas) [estimado: simulador]\n", worst, kSeeds);
 }
 
 static void testMotionRestartsWindow() {

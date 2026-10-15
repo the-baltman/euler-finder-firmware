@@ -193,6 +193,8 @@ python m2/test/host/mutate.py             # rompe el codigo a proposito: todos l
 ```
 Necesitan un compilador de C++ (g++) en el PATH.
 
+Las cifras que imprimen las pruebas salen de ruido supuesto, no del sensor: no son la precision del equipo y no se citan como tal.
+
 ### Prueba de cuelgue (con la placa) [por verificar en banco]
 
 Comprueba que el equipo se reinicia solo si la tarea de control se cuelga. Hay dos entornos de prueba; cada uno se cuelga a proposito a los 15 s del arranque.

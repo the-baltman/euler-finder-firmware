@@ -1,6 +1,6 @@
 // Simulador de un IMU para las pruebas de host. Independiente del código bajo prueba:
 // la verdad se genera con matrices de rotación en double; el firmware usa cuaterniones en float.
-// Los ruidos y sesgos son SUPUESTOS DE SIMULACIÓN [simulado], no mediciones del sensor real.
+// Los ruidos y sesgos son SUPUESTOS DE SIMULACIÓN [estimado: simulador], no mediciones del sensor real.
 #pragma once
 #include <cmath>
 #include <random>
@@ -69,10 +69,10 @@ inline void truePointing(const Mat3& r, bool pointing_flat, double* az_deg, doub
 }
 
 struct NoiseModel {
-  double gyro_sigma_dps = 0.1;    // [simulado]
-  double accel_sigma_g = 0.003;   // [simulado]
-  double gyro_scale_err = 0.005;  // [simulado] error de escala del giroscopio (0.5 %)
-  double accel_dist_g = 0.05;     // [simulado] aceleración lineal de la mano mientras se mueve
+  double gyro_sigma_dps = 0.1;    // [estimado: simulador]
+  double accel_sigma_g = 0.003;   // [estimado: simulador]
+  double gyro_scale_err = 0.005;  // [estimado: simulador] error de escala del giroscopio (0.5 %)
+  double accel_dist_g = 0.05;     // [estimado: simulador] aceleración lineal de la mano mientras se mueve
 };
 
 // Genera lecturas de IMU a partir de una secuencia de orientaciones verdaderas.
